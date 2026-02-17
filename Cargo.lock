@@ -231,6 +231,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "app-backend"
+version = "0.1.0"
+dependencies = [
+ "actix-cors",
+ "actix-web",
+ "serde",
+ "shared-types",
+]
+
+[[package]]
 name = "base64"
 version = "0.22.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -973,16 +983,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cfcb3a22ef46e85b45de6ee7e79d063319ebb6594faafcf1c225ea92ab6e9b92"
 dependencies = [
  "semver",
-]
-
-[[package]]
-name = "app-backend"
-version = "0.1.0"
-dependencies = [
- "actix-cors",
- "actix-web",
- "serde",
- "shared-types",
 ]
 
 [[package]]

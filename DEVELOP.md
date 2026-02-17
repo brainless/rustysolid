@@ -48,4 +48,4 @@ For each new feature:
 4. Add UI and state in `gui` and/or `admin-gui` using generated types.
 5. Update docs for behavior and constraints.
 
-This follows the same direction as the typed design approach documented in Dwata (`docs/07-type-driven-financial-extraction.md` there): design into trusted domain types, then implement around that contract.
+Use strict shared contracts as the first design boundary, then implement backend and UI around those contracts.

@@ -22,7 +22,8 @@ for v in "${required_vars[@]}"; do
   fi
 done
 
-REMOTE_ROOT="~/Projects/${PROJECT_NAME}"
+REMOTE_BASE_DIR="${REMOTE_BASE_DIR:-~/apps}"
+REMOTE_ROOT="${REMOTE_BASE_DIR}/${PROJECT_NAME}"
 SRC_ARCHIVE="/tmp/${PROJECT_NAME}-src.tar.gz"
 DEPLOY_ROOT="/opt/${PROJECT_NAME}"
 BACKEND_BIN="${PROJECT_NAME}-backend"
