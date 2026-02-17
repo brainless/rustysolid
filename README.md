@@ -25,6 +25,7 @@ Set at minimum:
 
 - `PROJECT_NAME`
 - `PROJECT_TITLE`
+- `DB_KIND` (`sqlite` or `postgres`)
 - `SERVER_IP`
 - `SSH_USER`
 - `DOMAIN_NAME`
@@ -36,9 +37,14 @@ Then apply naming across crate/package/docs:
 scripts/init-project.sh
 ```
 
+`init-project.sh` also sets the backend default Cargo feature based on `DB_KIND`:
+- `sqlite` -> `db-sqlite`
+- `postgres` -> `db-postgres`
+
 ## What This Template Includes
 
 - `GET /api/heartbeat` in backend
+- Startup DB schema migration execution (feature-gated by backend DB feature)
 - Shared `HeartbeatResponse` type defined in Rust
 - Generated TypeScript type consumed by GUI
 - `gui`: Hello World + heartbeat status
@@ -47,6 +53,7 @@ scripts/init-project.sh
 - `nginx` site template for GUI + `/api` reverse proxy
 - certbot setup flow for TLS certificates
 - pre-commit hook for Rust and frontend checks
+- auth starter files for Casbin (`backend/authz`) and SQL migrations (`backend/migrations`)
 
 ## Project Layout
 
@@ -107,6 +114,7 @@ scripts/install-git-hooks.sh
 
 Pre-commit checks:
 
+- `authz` model/migration sync check
 - `cargo fmt --all --check`
 - `cargo check --workspace`
 - `cargo test --workspace`
