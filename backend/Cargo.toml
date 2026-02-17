@@ -1,0 +1,10 @@
+[package]
+name = "app-backend"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+actix-cors = "0.7"
+actix-web.workspace = true
+serde.workspace = true
+shared-types = { path = "../shared-types" }
