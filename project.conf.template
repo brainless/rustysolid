@@ -2,6 +2,10 @@
 PROJECT_NAME=myapp
 PROJECT_TITLE=My App
 DB_KIND=sqlite
+# Used by backend DB startup; env DATABASE_URL overrides this value.
+# sqlite example: DATABASE_URL=app.db
+# postgres example: DATABASE_URL=postgres://postgres:postgres@127.0.0.1:5432/myapp
+DATABASE_URL=app.db
 
 SERVER_IP=203.0.113.10
 SSH_USER=deploy

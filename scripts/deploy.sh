@@ -27,6 +27,7 @@ REMOTE_ROOT="${REMOTE_BASE_DIR}/${PROJECT_NAME}"
 SRC_ARCHIVE="/tmp/${PROJECT_NAME}-src.tar.gz"
 DEPLOY_ROOT="/opt/${PROJECT_NAME}"
 BACKEND_BIN="${PROJECT_NAME}-backend"
+MIGRATE_BIN="migrate"
 SERVICE_NAME="${PROJECT_NAME}-backend"
 NGINX_SITE_NAME="${PROJECT_NAME}"
 TEMP_CERT_SITE="${PROJECT_NAME}-temp-cert"
@@ -58,13 +59,24 @@ rm "$SRC_ARCHIVE"
 remote_exec "rm -rf ${REMOTE_ROOT} && mkdir -p ${REMOTE_ROOT} && tar -xzf ~/${PROJECT_NAME}-src.tar.gz -C ${REMOTE_ROOT} && rm ~/${PROJECT_NAME}-src.tar.gz"
 
 echo "[deploy] build backend on server"
-remote_exec "cd ${REMOTE_ROOT} && source ~/.cargo/env && cargo build --release -p ${BACKEND_BIN}"
+remote_exec "cd ${REMOTE_ROOT} && source ~/.cargo/env && cargo build --release -p ${BACKEND_BIN} --bin ${BACKEND_BIN} --bin ${MIGRATE_BIN}"
 
 echo "[deploy] install backend binary"
 remote_exec "sudo mkdir -p ${DEPLOY_ROOT}"
 remote_exec "sudo cp ${REMOTE_ROOT}/target/release/${BACKEND_BIN} ${DEPLOY_ROOT}/${BACKEND_BIN}"
+remote_exec "sudo cp ${REMOTE_ROOT}/target/release/${MIGRATE_BIN} ${DEPLOY_ROOT}/${MIGRATE_BIN}"
 remote_exec "sudo chmod +x ${DEPLOY_ROOT}/${BACKEND_BIN}"
+remote_exec "sudo chmod +x ${DEPLOY_ROOT}/${MIGRATE_BIN}"
 remote_exec "sudo chown ${SSH_USER}:${SSH_USER} ${DEPLOY_ROOT}/${BACKEND_BIN}"
+remote_exec "sudo chown ${SSH_USER}:${SSH_USER} ${DEPLOY_ROOT}/${MIGRATE_BIN}"
+
+echo "[deploy] run database migrations"
+if [ -n "${DATABASE_URL:-}" ]; then
+  DB_URL_ESCAPED="$(printf '%q' "${DATABASE_URL}")"
+  remote_exec "cd ${DEPLOY_ROOT} && DATABASE_URL=${DB_URL_ESCAPED} ./${MIGRATE_BIN}"
+else
+  remote_exec "cd ${DEPLOY_ROOT} && ./${MIGRATE_BIN}"
+fi
 
 echo "[deploy] upload gui dist"
 remote_exec "sudo rm -rf ${DEPLOY_ROOT}/gui/* && sudo mkdir -p ${DEPLOY_ROOT}/gui"

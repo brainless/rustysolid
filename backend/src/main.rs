@@ -3,7 +3,6 @@ use actix_web::{get, web, App, HttpResponse, HttpServer, Responder};
 use shared_types::HeartbeatResponse;
 
 mod auth;
-mod db;
 
 #[get("/api/heartbeat")]
 async fn heartbeat() -> impl Responder {
@@ -17,8 +16,6 @@ async fn heartbeat() -> impl Responder {
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    db::run_startup_migrations()?;
-
     let bind_addr = ("127.0.0.1", 8080);
     println!("Backend listening on http://{}:{}", bind_addr.0, bind_addr.1);
 

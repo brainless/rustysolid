@@ -26,6 +26,7 @@ Set at minimum:
 - `PROJECT_NAME`
 - `PROJECT_TITLE`
 - `DB_KIND` (`sqlite` or `postgres`)
+- `DATABASE_URL` (required for postgres; optional for sqlite)
 - `SERVER_IP`
 - `SSH_USER`
 - `DOMAIN_NAME`
@@ -44,7 +45,7 @@ scripts/init-project.sh
 ## What This Template Includes
 
 - `GET /api/heartbeat` in backend
-- Startup DB schema migration execution (feature-gated by backend DB feature)
+- Embedded DB schema migrations via dedicated backend migrate binary
 - Shared `HeartbeatResponse` type defined in Rust
 - Generated TypeScript type consumed by GUI
 - `gui`: Hello World + heartbeat status
@@ -80,8 +81,11 @@ cargo run -p shared-types --bin generate_api_types
 2. Run backend:
 
 ```bash
+cargo run -p app-backend --bin migrate
 cargo run -p app-backend
 ```
+
+`DATABASE_URL` is read from environment first, then `project.conf`.
 
 3. Run main GUI:
 
@@ -128,7 +132,7 @@ Pre-commit checks:
 
 Both scripts read `project.conf` by default. You can pass a custom config path if needed.
 
-`deploy.sh` uploads full source via `scp`, builds backend on server, installs `systemd` and `nginx` config, and keeps certbot renew timer enabled.
+`deploy.sh` uploads full source via `scp`, builds backend on server, runs migrations using the migrate binary, installs `systemd` and `nginx` config, and keeps certbot renew timer enabled.
 
 ## Development Model
 
