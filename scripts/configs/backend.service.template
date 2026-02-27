@@ -11,6 +11,8 @@ ExecStart=/opt/{{PROJECT_NAME}}/{{PROJECT_NAME}}-backend
 Restart=always
 RestartSec=3
 Environment=RUST_LOG=info
+Environment=BACKEND_HOST={{BACKEND_HOST}}
+Environment=BACKEND_PORT={{BACKEND_PORT}}
 
 [Install]
 WantedBy=multi-user.target

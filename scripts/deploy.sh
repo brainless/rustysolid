@@ -23,6 +23,8 @@ for v in "${required_vars[@]}"; do
 done
 
 REMOTE_BASE_DIR="${REMOTE_BASE_DIR:-~/apps}"
+BACKEND_HOST="${BACKEND_HOST:-127.0.0.1}"
+BACKEND_PORT="${BACKEND_PORT:-8080}"
 REMOTE_ROOT="${REMOTE_BASE_DIR}/${PROJECT_NAME}"
 SRC_ARCHIVE="/tmp/${PROJECT_NAME}-src.tar.gz"
 DEPLOY_ROOT="/opt/${PROJECT_NAME}"
@@ -85,14 +87,14 @@ remote_exec "sudo mv /tmp/${PROJECT_NAME}-gui-dist/* ${DEPLOY_ROOT}/gui/ && rmdi
 remote_exec "sudo chown -R ${SSH_USER}:${SSH_USER} ${DEPLOY_ROOT}/gui"
 
 echo "[deploy] install systemd service"
-remote_exec "sed -e 's|{{SSH_USER}}|${SSH_USER}|g' -e 's|{{PROJECT_NAME}}|${PROJECT_NAME}|g' ${REMOTE_ROOT}/scripts/configs/backend.service.template > /tmp/${SERVICE_NAME}.service"
+remote_exec "sed -e 's|{{SSH_USER}}|${SSH_USER}|g' -e 's|{{PROJECT_NAME}}|${PROJECT_NAME}|g' -e 's|{{BACKEND_HOST}}|${BACKEND_HOST}|g' -e 's|{{BACKEND_PORT}}|${BACKEND_PORT}|g' ${REMOTE_ROOT}/scripts/configs/backend.service.template > /tmp/${SERVICE_NAME}.service"
 remote_exec "sudo mv /tmp/${SERVICE_NAME}.service /etc/systemd/system/${SERVICE_NAME}.service"
 remote_exec "sudo systemctl daemon-reload"
 remote_exec "sudo systemctl enable ${SERVICE_NAME}"
 remote_exec "sudo systemctl restart ${SERVICE_NAME}"
 
 echo "[deploy] install nginx config"
-remote_exec "sed -e 's|{{DOMAIN_NAME}}|${DOMAIN_NAME}|g' -e 's|{{PROJECT_NAME}}|${PROJECT_NAME}|g' ${REMOTE_ROOT}/scripts/configs/nginx.conf.template > /tmp/${NGINX_SITE_NAME}.conf"
+remote_exec "sed -e 's|{{DOMAIN_NAME}}|${DOMAIN_NAME}|g' -e 's|{{PROJECT_NAME}}|${PROJECT_NAME}|g' -e 's|{{BACKEND_PORT}}|${BACKEND_PORT}|g' ${REMOTE_ROOT}/scripts/configs/nginx.conf.template > /tmp/${NGINX_SITE_NAME}.conf"
 remote_exec "sudo mv /tmp/${NGINX_SITE_NAME}.conf /etc/nginx/sites-available/${NGINX_SITE_NAME}"
 remote_exec "sudo ln -sf /etc/nginx/sites-available/${NGINX_SITE_NAME} /etc/nginx/sites-enabled/${NGINX_SITE_NAME}"
 remote_exec "sudo rm -f /etc/nginx/sites-enabled/default"
