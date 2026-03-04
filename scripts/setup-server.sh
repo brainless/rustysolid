@@ -32,8 +32,31 @@ remote_exec() {
 }
 
 echo "[setup] installing base packages"
-remote_exec "sudo apt-get update"
-remote_exec "sudo apt-get install -y build-essential pkg-config libssl-dev curl git nginx certbot python3-certbot-nginx"
+remote_exec "sudo apt-get update && sudo apt-get upgrade -y"
+remote_exec "sudo apt-get install -y build-essential pkg-config libssl-dev curl git nginx certbot python3-certbot-nginx ufw fail2ban"
+
+echo "[setup] configuring firewall"
+remote_exec "sudo ufw default deny incoming"
+remote_exec "sudo ufw default allow outgoing"
+remote_exec "sudo ufw allow 22/tcp"
+remote_exec "sudo ufw allow 80/tcp"
+remote_exec "sudo ufw allow 443/tcp"
+remote_exec "sudo ufw --force enable"
+
+echo "[setup] enabling fail2ban"
+remote_exec "sudo systemctl enable fail2ban && sudo systemctl start fail2ban"
+
+echo "[setup] hardening SSH"
+remote_exec "sudo sed -i 's/^#*PasswordAuthentication.*/PasswordAuthentication no/' /etc/ssh/sshd_config"
+remote_exec "sudo sed -i 's/^#*ChallengeResponseAuthentication.*/ChallengeResponseAuthentication no/' /etc/ssh/sshd_config"
+remote_exec "sudo sed -i 's/^#*PubkeyAuthentication.*/PubkeyAuthentication yes/' /etc/ssh/sshd_config"
+remote_exec "sudo sed -i 's/^#*PermitRootLogin.*/PermitRootLogin no/' /etc/ssh/sshd_config"
+remote_exec "sudo sshd -t"
+if remote_exec "sudo systemctl list-unit-files | grep -q '^ssh.service'"; then
+  remote_exec "sudo systemctl restart ssh"
+else
+  remote_exec "sudo systemctl restart sshd"
+fi
 
 if ! remote_exec "command -v cargo >/dev/null 2>&1"; then
   echo "[setup] installing rust"
