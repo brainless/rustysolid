@@ -14,7 +14,7 @@ fi
 # shellcheck disable=SC1090
 source "$CONFIG_FILE"
 
-required_vars=(PROJECT_NAME SERVER_IP SSH_USER DOMAIN_NAME)
+required_vars=(PROJECT_NAME SERVER_IP SSH_USER DOMAIN_NAME DATABASE_URL)
 for v in "${required_vars[@]}"; do
   if [ -z "${!v:-}" ]; then
     echo "Missing required config key: $v"
@@ -87,7 +87,7 @@ remote_exec "sudo mv /tmp/${PROJECT_NAME}-gui-dist/* ${DEPLOY_ROOT}/gui/ && rmdi
 remote_exec "sudo chown -R ${SSH_USER}:${SSH_USER} ${DEPLOY_ROOT}/gui"
 
 echo "[deploy] install systemd service"
-remote_exec "sed -e 's|{{SSH_USER}}|${SSH_USER}|g' -e 's|{{PROJECT_NAME}}|${PROJECT_NAME}|g' -e 's|{{BACKEND_HOST}}|${BACKEND_HOST}|g' -e 's|{{BACKEND_PORT}}|${BACKEND_PORT}|g' ${REMOTE_ROOT}/scripts/configs/backend.service.template > /tmp/${SERVICE_NAME}.service"
+remote_exec "sed -e 's|{{SSH_USER}}|${SSH_USER}|g' -e 's|{{PROJECT_NAME}}|${PROJECT_NAME}|g' -e 's|{{BACKEND_HOST}}|${BACKEND_HOST}|g' -e 's|{{BACKEND_PORT}}|${BACKEND_PORT}|g' -e 's|{{DATABASE_URL}}|${DATABASE_URL}|g' ${REMOTE_ROOT}/scripts/configs/backend.service.template > /tmp/${SERVICE_NAME}.service"
 remote_exec "sudo mv /tmp/${SERVICE_NAME}.service /etc/systemd/system/${SERVICE_NAME}.service"
 remote_exec "sudo systemctl daemon-reload"
 remote_exec "sudo systemctl enable ${SERVICE_NAME}"
