@@ -22,7 +22,7 @@ for v in "${required_vars[@]}"; do
   fi
 done
 
-REMOTE_BASE_DIR="${REMOTE_BASE_DIR:-~/apps}"
+REMOTE_BASE_DIR="${REMOTE_BASE_DIR:-/home/${SSH_USER}/apps}"
 BACKEND_HOST="${BACKEND_HOST:-127.0.0.1}"
 BACKEND_PORT="${BACKEND_PORT:-8080}"
 REMOTE_ROOT="${REMOTE_BASE_DIR}/${PROJECT_NAME}"
@@ -58,7 +58,7 @@ tar -czf "$SRC_ARCHIVE" \
 scp -o StrictHostKeyChecking=no "$SRC_ARCHIVE" "${SSH_USER}@${SERVER_IP}:~/"
 rm "$SRC_ARCHIVE"
 
-remote_exec "rm -rf ${REMOTE_ROOT} && mkdir -p ${REMOTE_ROOT} && tar -xzf ~/${PROJECT_NAME}-src.tar.gz -C ${REMOTE_ROOT} && rm ~/${PROJECT_NAME}-src.tar.gz"
+remote_exec "mkdir -p ${REMOTE_ROOT} && tar -xzf ~/${PROJECT_NAME}-src.tar.gz -C ${REMOTE_ROOT} && rm ~/${PROJECT_NAME}-src.tar.gz"
 
 echo "[deploy] build backend on server"
 remote_exec "cd ${REMOTE_ROOT} && source ~/.cargo/env && cargo build --release -p ${BACKEND_BIN} --bin ${BACKEND_BIN} --bin ${MIGRATE_BIN}"
