@@ -22,7 +22,7 @@ for v in "${required_vars[@]}"; do
   fi
 done
 
-REMOTE_BASE_DIR="${REMOTE_BASE_DIR:-~/apps}"
+REMOTE_BASE_DIR="${REMOTE_BASE_DIR:-/home/${SSH_USER}/apps}"
 REMOTE_PROJECT_ROOT="${REMOTE_BASE_DIR}/${PROJECT_NAME}"
 DEPLOY_ROOT="/opt/${PROJECT_NAME}"
 TEMP_CERT_SITE="${PROJECT_NAME}-temp-cert"
