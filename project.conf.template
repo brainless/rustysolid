@@ -16,4 +16,4 @@ SERVER_IP=203.0.113.10
 SSH_USER=deploy
 DOMAIN_NAME=example.com
 LETSENCRYPT_EMAIL=admin@example.com
-REMOTE_BASE_DIR=~/apps
+REMOTE_BASE_DIR=/home/${SSH_USER}/apps
