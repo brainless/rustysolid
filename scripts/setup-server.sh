@@ -63,6 +63,7 @@ if ! remote_exec "command -v cargo >/dev/null 2>&1"; then
   remote_exec "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y"
 fi
 
+DB_PASSWORD=""
 if [ "${DB_KIND:-}" = "postgres" ]; then
   echo "[setup] installing postgresql"
   remote_exec "sudo apt-get install -y postgresql postgresql-contrib"
@@ -74,13 +75,23 @@ if [ "${DB_KIND:-}" = "postgres" ]; then
   DB_PASSWORD=$(LC_ALL=C tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 24)
   remote_exec "sudo -u postgres psql -c \"ALTER ROLE ${SSH_USER} PASSWORD '${DB_PASSWORD}';\""
   echo "[setup] postgres ready"
-  echo "[setup] set this in project.conf before running deploy.sh:"
-  echo "[setup]   DATABASE_URL=postgresql://${SSH_USER}:${DB_PASSWORD}@localhost/${PROJECT_NAME}"
 fi
 
 remote_exec "mkdir -p ${REMOTE_PROJECT_ROOT}"
-remote_exec "sudo mkdir -p ${DEPLOY_ROOT}/gui"
+remote_exec "sudo mkdir -p ${DEPLOY_ROOT}/gui ${DEPLOY_ROOT}/admin-gui"
 remote_exec "sudo chown -R ${SSH_USER}:${SSH_USER} ${DEPLOY_ROOT}"
+
+echo "[setup] writing server.env"
+{
+  printf 'BACKEND_HOST=%s\n' "${BACKEND_HOST:-127.0.0.1}"
+  printf 'BACKEND_PORT=%s\n' "${BACKEND_PORT:-8080}"
+  if [ -n "${DB_PASSWORD}" ]; then
+    printf 'DATABASE_URL=postgresql://%s:%s@localhost/%s\n' "${SSH_USER}" "${DB_PASSWORD}" "${PROJECT_NAME}"
+  else
+    printf 'DATABASE_URL=app.db\n'
+  fi
+} | ssh -o StrictHostKeyChecking=no "${SSH_USER}@${SERVER_IP}" "cat > /tmp/server.env"
+remote_exec "sudo mv /tmp/server.env ${DEPLOY_ROOT}/server.env && sudo chown ${SSH_USER}:${SSH_USER} ${DEPLOY_ROOT}/server.env && chmod 600 ${DEPLOY_ROOT}/server.env"
 
 echo "[setup] upload certbot nginx bootstrap template"
 scp -o StrictHostKeyChecking=no "${PROJECT_ROOT}/scripts/configs/nginx-temp-cert.conf.template" "${SSH_USER}@${SERVER_IP}:/tmp/nginx-temp-cert.conf.template"

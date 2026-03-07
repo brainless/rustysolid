@@ -2,7 +2,8 @@
 PROJECT_NAME=myapp
 PROJECT_TITLE=My App
 DB_KIND=sqlite
-# Used by backend DB startup; env DATABASE_URL overrides this value.
+# Local development DB only. Not used by deploy scripts — the server gets its
+# own DATABASE_URL written to /opt/$PROJECT_NAME/server.env by setup-server.sh.
 # sqlite example: DATABASE_URL=app.db
 # postgres example: DATABASE_URL=postgres://postgres:postgres@127.0.0.1:5432/myapp
 DATABASE_URL=app.db

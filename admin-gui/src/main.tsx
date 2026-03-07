@@ -5,7 +5,7 @@ import App from './App';
 
 render(
   () => (
-    <Router>
+    <Router base="/admin">
       <Route path="/" component={App} />
     </Router>
   ),

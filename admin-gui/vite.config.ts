@@ -26,10 +26,15 @@ function readProjectConf(key: string): string | undefined {
 }
 
 const adminGuiPort = parseInt(process.env.ADMIN_GUI_PORT ?? readProjectConf('ADMIN_GUI_PORT') ?? '3031');
+const backendPort = parseInt(process.env.BACKEND_PORT ?? readProjectConf('BACKEND_PORT') ?? '8080');
 
 export default defineConfig({
   plugins: [solid(), tailwindcss()],
+  base: '/admin/',
   server: {
     port: adminGuiPort,
+    proxy: {
+      '/api': `http://127.0.0.1:${backendPort}`,
+    },
   },
 });

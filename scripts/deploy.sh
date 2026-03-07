@@ -14,7 +14,7 @@ fi
 # shellcheck disable=SC1090
 source "$CONFIG_FILE"
 
-required_vars=(PROJECT_NAME SERVER_IP SSH_USER DOMAIN_NAME DATABASE_URL)
+required_vars=(PROJECT_NAME SERVER_IP SSH_USER DOMAIN_NAME)
 for v in "${required_vars[@]}"; do
   if [ -z "${!v:-}" ]; then
     echo "Missing required config key: $v"
@@ -23,7 +23,6 @@ for v in "${required_vars[@]}"; do
 done
 
 REMOTE_BASE_DIR="${REMOTE_BASE_DIR:-/home/${SSH_USER}/apps}"
-BACKEND_HOST="${BACKEND_HOST:-127.0.0.1}"
 BACKEND_PORT="${BACKEND_PORT:-8080}"
 REMOTE_ROOT="${REMOTE_BASE_DIR}/${PROJECT_NAME}"
 SRC_ARCHIVE="/tmp/${PROJECT_NAME}-src.tar.gz"
@@ -43,6 +42,11 @@ cd "$PROJECT_ROOT/gui"
 npm install
 npm run build
 
+echo "[deploy] build admin-gui locally"
+cd "$PROJECT_ROOT/admin-gui"
+npm install
+npm run build
+
 echo "[deploy] upload source tree"
 cd "$PROJECT_ROOT"
 tar -czf "$SRC_ARCHIVE" \
@@ -58,13 +62,14 @@ tar -czf "$SRC_ARCHIVE" \
 scp -o StrictHostKeyChecking=no "$SRC_ARCHIVE" "${SSH_USER}@${SERVER_IP}:~/"
 rm "$SRC_ARCHIVE"
 
-remote_exec "mkdir -p ${REMOTE_ROOT} && tar -xzf ~/${PROJECT_NAME}-src.tar.gz -C ${REMOTE_ROOT} && rm ~/${PROJECT_NAME}-src.tar.gz"
+remote_exec "rm -rf ${REMOTE_ROOT} && mkdir -p ${REMOTE_ROOT} && tar -xzf ~/${PROJECT_NAME}-src.tar.gz -C ${REMOTE_ROOT} && rm ~/${PROJECT_NAME}-src.tar.gz"
 
 echo "[deploy] build backend on server"
 remote_exec "cd ${REMOTE_ROOT} && source ~/.cargo/env && cargo build --release -p ${BACKEND_BIN} --bin ${BACKEND_BIN} --bin ${MIGRATE_BIN}"
 
 echo "[deploy] install backend binary"
 remote_exec "sudo mkdir -p ${DEPLOY_ROOT}"
+remote_exec "sudo systemctl stop ${SERVICE_NAME} 2>/dev/null || true"
 remote_exec "sudo cp ${REMOTE_ROOT}/target/release/${BACKEND_BIN} ${DEPLOY_ROOT}/${BACKEND_BIN}"
 remote_exec "sudo cp ${REMOTE_ROOT}/target/release/${MIGRATE_BIN} ${DEPLOY_ROOT}/${MIGRATE_BIN}"
 remote_exec "sudo chmod +x ${DEPLOY_ROOT}/${BACKEND_BIN}"
@@ -73,12 +78,7 @@ remote_exec "sudo chown ${SSH_USER}:${SSH_USER} ${DEPLOY_ROOT}/${BACKEND_BIN}"
 remote_exec "sudo chown ${SSH_USER}:${SSH_USER} ${DEPLOY_ROOT}/${MIGRATE_BIN}"
 
 echo "[deploy] run database migrations"
-if [ -n "${DATABASE_URL:-}" ]; then
-  DB_URL_ESCAPED="$(printf '%q' "${DATABASE_URL}")"
-  remote_exec "cd ${DEPLOY_ROOT} && DATABASE_URL=${DB_URL_ESCAPED} ./${MIGRATE_BIN}"
-else
-  remote_exec "cd ${DEPLOY_ROOT} && ./${MIGRATE_BIN}"
-fi
+remote_exec "bash -c 'set -a; . ${DEPLOY_ROOT}/server.env; cd ${DEPLOY_ROOT}; ./${MIGRATE_BIN}'"
 
 echo "[deploy] upload gui dist"
 remote_exec "sudo rm -rf ${DEPLOY_ROOT}/gui/* && sudo mkdir -p ${DEPLOY_ROOT}/gui"
@@ -86,8 +86,14 @@ scp -o StrictHostKeyChecking=no -r "$PROJECT_ROOT/gui/dist/"* "${SSH_USER}@${SER
 remote_exec "sudo mv /tmp/${PROJECT_NAME}-gui-dist/* ${DEPLOY_ROOT}/gui/ && rmdir /tmp/${PROJECT_NAME}-gui-dist"
 remote_exec "sudo chown -R ${SSH_USER}:${SSH_USER} ${DEPLOY_ROOT}/gui"
 
+echo "[deploy] upload admin-gui dist"
+remote_exec "sudo rm -rf ${DEPLOY_ROOT}/admin-gui/* && sudo mkdir -p ${DEPLOY_ROOT}/admin-gui"
+scp -o StrictHostKeyChecking=no -r "$PROJECT_ROOT/admin-gui/dist/"* "${SSH_USER}@${SERVER_IP}:/tmp/${PROJECT_NAME}-admin-gui-dist/"
+remote_exec "sudo mv /tmp/${PROJECT_NAME}-admin-gui-dist/* ${DEPLOY_ROOT}/admin-gui/ && rmdir /tmp/${PROJECT_NAME}-admin-gui-dist"
+remote_exec "sudo chown -R ${SSH_USER}:${SSH_USER} ${DEPLOY_ROOT}/admin-gui"
+
 echo "[deploy] install systemd service"
-remote_exec "sed -e 's|{{SSH_USER}}|${SSH_USER}|g' -e 's|{{PROJECT_NAME}}|${PROJECT_NAME}|g' -e 's|{{BACKEND_HOST}}|${BACKEND_HOST}|g' -e 's|{{BACKEND_PORT}}|${BACKEND_PORT}|g' -e 's|{{DATABASE_URL}}|${DATABASE_URL}|g' ${REMOTE_ROOT}/scripts/configs/backend.service.template > /tmp/${SERVICE_NAME}.service"
+remote_exec "sed -e 's|{{SSH_USER}}|${SSH_USER}|g' -e 's|{{PROJECT_NAME}}|${PROJECT_NAME}|g' ${REMOTE_ROOT}/scripts/configs/backend.service.template > /tmp/${SERVICE_NAME}.service"
 remote_exec "sudo mv /tmp/${SERVICE_NAME}.service /etc/systemd/system/${SERVICE_NAME}.service"
 remote_exec "sudo systemctl daemon-reload"
 remote_exec "sudo systemctl enable ${SERVICE_NAME}"
@@ -107,6 +113,13 @@ if remote_exec "sudo test -f /etc/letsencrypt/live/${DOMAIN_NAME}/fullchain.pem"
   echo "[deploy] tls cert present"
 else
   echo "[deploy] tls cert missing; run setup-server.sh first"
+  exit 1
+fi
+
+if remote_exec "test -f ${DEPLOY_ROOT}/server.env"; then
+  echo "[deploy] server.env present"
+else
+  echo "[deploy] server.env missing; run setup-server.sh first"
   exit 1
 fi
 remote_exec "sudo systemctl enable certbot.timer"

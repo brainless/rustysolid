@@ -18,6 +18,11 @@ server {
     root /opt/{{PROJECT_NAME}}/gui;
     index index.html;
 
+    location /admin/ {
+        alias /opt/{{PROJECT_NAME}}/admin-gui/;
+        try_files $uri $uri/ /admin/index.html;
+    }
+
     location /api/ {
         proxy_pass http://127.0.0.1:{{BACKEND_PORT}};
         proxy_http_version 1.1;
