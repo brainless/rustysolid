@@ -13,7 +13,7 @@ RestartSec=3
 Environment=RUST_LOG=info
 Environment=BACKEND_HOST={{BACKEND_HOST}}
 Environment=BACKEND_PORT={{BACKEND_PORT}}
-Environment=DATABASE_URL={{DATABASE_URL}}
+Environment="DATABASE_URL={{DATABASE_URL}}"
 
 [Install]
 WantedBy=multi-user.target

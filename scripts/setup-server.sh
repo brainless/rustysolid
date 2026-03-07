@@ -63,6 +63,21 @@ if ! remote_exec "command -v cargo >/dev/null 2>&1"; then
   remote_exec "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y"
 fi
 
+if [ "${DB_KIND:-}" = "postgres" ]; then
+  echo "[setup] installing postgresql"
+  remote_exec "sudo apt-get install -y postgresql postgresql-contrib"
+  remote_exec "sudo systemctl enable postgresql && sudo systemctl start postgresql"
+  echo "[setup] creating postgres role and database"
+  remote_exec "sudo -u postgres createuser --no-superuser --no-createdb --no-createrole ${SSH_USER} 2>/dev/null || true"
+  remote_exec "sudo -u postgres createdb -O ${SSH_USER} ${PROJECT_NAME} 2>/dev/null || true"
+  echo "[setup] setting postgres role password"
+  DB_PASSWORD=$(LC_ALL=C tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 24)
+  remote_exec "sudo -u postgres psql -c \"ALTER ROLE ${SSH_USER} PASSWORD '${DB_PASSWORD}';\""
+  echo "[setup] postgres ready"
+  echo "[setup] set this in project.conf before running deploy.sh:"
+  echo "[setup]   DATABASE_URL=postgresql://${SSH_USER}:${DB_PASSWORD}@localhost/${PROJECT_NAME}"
+fi
+
 remote_exec "mkdir -p ${REMOTE_PROJECT_ROOT}"
 remote_exec "sudo mkdir -p ${DEPLOY_ROOT}/gui"
 remote_exec "sudo chown -R ${SSH_USER}:${SSH_USER} ${DEPLOY_ROOT}"
