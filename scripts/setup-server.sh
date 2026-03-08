@@ -33,7 +33,7 @@ remote_exec() {
 
 echo "[setup] installing base packages"
 remote_exec "sudo apt-get update && sudo apt-get upgrade -y"
-remote_exec "sudo apt-get install -y build-essential pkg-config libssl-dev curl git nginx certbot python3-certbot-nginx ufw fail2ban"
+remote_exec "sudo apt-get install -y build-essential pkg-config libssl-dev curl git rsync nginx certbot python3-certbot-nginx ufw fail2ban"
 
 echo "[setup] configuring firewall"
 remote_exec "sudo ufw default deny incoming"
@@ -61,6 +61,11 @@ fi
 if ! remote_exec "command -v cargo >/dev/null 2>&1"; then
   echo "[setup] installing rust"
   remote_exec "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y"
+fi
+
+if ! remote_exec "command -v sccache >/dev/null 2>&1"; then
+  echo "[setup] installing sccache"
+  remote_exec "SCCACHE_VER=\$(curl -fsSL -o /dev/null -w '%{url_effective}' https://github.com/mozilla/sccache/releases/latest | grep -o 'v[0-9.]*\$') && curl -fsSL \"https://github.com/mozilla/sccache/releases/download/\${SCCACHE_VER}/sccache-\${SCCACHE_VER}-x86_64-unknown-linux-musl.tar.gz\" | tar xz -C /tmp && sudo mv /tmp/sccache-\${SCCACHE_VER}-x86_64-unknown-linux-musl/sccache /usr/local/bin/sccache && rm -rf /tmp/sccache-\${SCCACHE_VER}-x86_64-unknown-linux-musl"
 fi
 
 DB_PASSWORD=""

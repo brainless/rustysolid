@@ -25,7 +25,6 @@ done
 REMOTE_BASE_DIR="${REMOTE_BASE_DIR:-/home/${SSH_USER}/apps}"
 BACKEND_PORT="${BACKEND_PORT:-8080}"
 REMOTE_ROOT="${REMOTE_BASE_DIR}/${PROJECT_NAME}"
-SRC_ARCHIVE="/tmp/${PROJECT_NAME}-src.tar.gz"
 DEPLOY_ROOT="/opt/${PROJECT_NAME}"
 BACKEND_BIN="${PROJECT_NAME}-backend"
 MIGRATE_BIN="migrate"
@@ -47,25 +46,24 @@ cd "$PROJECT_ROOT/admin-gui"
 npm install
 npm run build
 
-echo "[deploy] upload source tree"
-cd "$PROJECT_ROOT"
-tar -czf "$SRC_ARCHIVE" \
-  --exclude='target' \
-  --exclude='gui/node_modules' \
-  --exclude='gui/dist' \
-  --exclude='admin-gui/node_modules' \
-  --exclude='admin-gui/dist' \
-  --exclude='.git' \
+echo "[deploy] sync source tree"
+remote_exec "command -v rsync >/dev/null 2>&1 || sudo apt-get install -y rsync"
+remote_exec "mkdir -p ${REMOTE_ROOT}"
+rsync -az --delete \
+  --exclude='target/' \
+  --exclude='gui/node_modules/' \
+  --exclude='gui/dist/' \
+  --exclude='admin-gui/node_modules/' \
+  --exclude='admin-gui/dist/' \
+  --exclude='.git/' \
   --exclude='.DS_Store' \
-  backend/ shared-types/ gui/ admin-gui/ scripts/ Cargo.toml README.md DEVELOP.md AGENTS.md project.conf.template
-
-scp -o StrictHostKeyChecking=no "$SRC_ARCHIVE" "${SSH_USER}@${SERVER_IP}:~/"
-rm "$SRC_ARCHIVE"
-
-remote_exec "rm -rf ${REMOTE_ROOT} && mkdir -p ${REMOTE_ROOT} && tar -xzf ~/${PROJECT_NAME}-src.tar.gz -C ${REMOTE_ROOT} && rm ~/${PROJECT_NAME}-src.tar.gz"
+  -e "ssh -o StrictHostKeyChecking=no" \
+  "$PROJECT_ROOT/" \
+  "${SSH_USER}@${SERVER_IP}:${REMOTE_ROOT}/"
 
 echo "[deploy] build backend on server"
-remote_exec "cd ${REMOTE_ROOT} && source ~/.cargo/env && cargo build --release -p ${BACKEND_BIN} --bin ${BACKEND_BIN} --bin ${MIGRATE_BIN}"
+remote_exec "command -v sccache >/dev/null 2>&1 || (SCCACHE_VER=\$(curl -fsSL -o /dev/null -w '%{url_effective}' https://github.com/mozilla/sccache/releases/latest | grep -o 'v[0-9.]*\$') && curl -fsSL \"https://github.com/mozilla/sccache/releases/download/\${SCCACHE_VER}/sccache-\${SCCACHE_VER}-x86_64-unknown-linux-musl.tar.gz\" | tar xz -C /tmp && sudo mv /tmp/sccache-\${SCCACHE_VER}-x86_64-unknown-linux-musl/sccache /usr/local/bin/sccache && rm -rf /tmp/sccache-\${SCCACHE_VER}-x86_64-unknown-linux-musl)"
+remote_exec "cd ${REMOTE_ROOT} && source ~/.cargo/env && RUSTC_WRAPPER=sccache cargo build --release -p ${BACKEND_BIN} --bin ${BACKEND_BIN} --bin ${MIGRATE_BIN}"
 
 echo "[deploy] install backend binary"
 remote_exec "sudo mkdir -p ${DEPLOY_ROOT}"
