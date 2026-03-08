@@ -29,7 +29,19 @@ const adminGuiPort = parseInt(process.env.ADMIN_GUI_PORT ?? readProjectConf('ADM
 const backendPort = parseInt(process.env.BACKEND_PORT ?? readProjectConf('BACKEND_PORT') ?? '8080');
 
 export default defineConfig({
-  plugins: [solid(), tailwindcss()],
+  plugins: [
+    solid(),
+    tailwindcss(),
+    {
+      name: 'admin-base-rewrite',
+      configureServer(server) {
+        server.middlewares.use((req, _res, next) => {
+          if (req.url === '/admin') req.url = '/admin/';
+          next();
+        });
+      },
+    },
+  ],
   base: '/admin/',
   server: {
     port: adminGuiPort,

@@ -18,6 +18,11 @@ server {
     root /opt/{{PROJECT_NAME}}/gui;
     index index.html;
 
+    location = /admin {
+        alias /opt/{{PROJECT_NAME}}/admin-gui/index.html;
+        add_header Content-Type text/html;
+    }
+
     location /admin/ {
         alias /opt/{{PROJECT_NAME}}/admin-gui/;
         try_files $uri $uri/ /admin/index.html;
