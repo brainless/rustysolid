@@ -1,51 +1,42 @@
 # DEVELOP
 
-## Type-Driven Feature Workflow
+This is a minimal template for fullstack development (human or agent). Shared Rust types drive everything.
 
-This template enforces a typed, shared-contract-first flow:
+## Scope
+
+Only maintain these parts: `backend`, `shared-types`, `gui`, `admin-gui`, `scripts`.
+Do not add extra services or crates unless explicitly requested.
+
+## Type-Driven Workflow
 
 1. Define API/domain types in `shared-types/src/*.rs`
-2. Export TypeScript types from the same Rust types
-3. Implement backend handlers using shared types
-4. Implement frontend features against generated types
+2. Regenerate TypeScript types: `cargo run -p shared-types --bin generate_api_types` → `gui/src/types/api.ts`
+3. Implement backend handler using shared types
+4. Implement UI in `gui`/`admin-gui` against generated types
 
-A feature is complete only when backend + frontend apps compile against the same shared contract.
-
-## Structure Rules
-
-- `shared-types` is the source of truth for API payloads.
-- Avoid handwritten duplicate API types in frontend apps.
-- Backend request/response bodies should use shared types whenever practical.
-- Prefer strict enums/newtypes for domain states over free-text values.
-
-## TypeScript Generation
-
-Generate frontend types:
-
-```bash
-cargo run -p shared-types --bin generate_api_types
-```
-
-Output file:
-
-- `gui/src/types/api.ts`
-
-Regenerate types whenever shared Rust API types change.
+A feature is complete only when backend + frontend compile against the same shared contract.
+Start from `shared-types`, never UI-first. Keep endpoints small and explicit. Prefer strict enums/newtypes over free-text states.
 
 ## Project Naming
 
 - Root config: `project.conf` (copy from `project.conf.template`)
-- Apply configured names: `scripts/init-project.sh`
-- Keep scripts/configs name-agnostic and parameterized by `PROJECT_NAME`.
+- Apply names: `scripts/init-project.sh`
+- Never hardcode app/repo names in scripts or configs — always parameterize by `PROJECT_NAME`.
 
-## Adding Future Features
+## Configuration
 
-For each new feature:
+Config is resolved in priority order: **env var → `project.conf` → `server.env`** (sibling to the binary on server).
 
-1. Add or extend types in `shared-types`.
-2. Regenerate TypeScript API types.
-3. Add backend endpoint in `backend` using shared types.
-4. Add UI and state in `gui` and/or `admin-gui` using generated types.
-5. Update docs for behavior and constraints.
+- `project.conf` — local development; read by backend and vite apps at dev/build time
+- env vars — override `project.conf`; injected by systemd on server
+- `server.env` — server-only secrets (e.g. `DATABASE_URL`); written by `setup-server.sh` to `DEPLOY_ROOT`, permissions `600`; auto-discovered by backend binaries via `current_exe()` path lookup
 
-Use strict shared contracts as the first design boundary, then implement backend and UI around those contracts.
+Backend helper binaries (`src/bin/`) include both `config.rs` and `db.rs` via `#[path]` and resolve config through `read_project_conf`. No manual env setup needed on the server.
+
+Vite apps (`gui`, `admin-gui`) read `project.conf` at build/dev time via `vite.config.ts` — they do not use `server.env`.
+
+## Structure Rules
+
+- `shared-types` is the source of truth for API payloads
+- Avoid handwritten duplicate API types in frontend apps
+- Avoid premature abstractions — keep code minimal and typed
