@@ -54,7 +54,7 @@ scripts/init-project.sh
 - `nginx` site template for GUI + `/api` reverse proxy
 - certbot setup flow for TLS certificates
 - pre-commit hook for Rust and frontend checks
-- auth starter files for Casbin (`backend/authz`) and SQL migrations (`backend/migrations`)
+- auth starter schema: `users`, `user_profiles`, `user_roles` tables in `backend/migrations`
 
 ## Project Layout
 
@@ -118,7 +118,6 @@ scripts/install-git-hooks.sh
 
 Pre-commit checks:
 
-- `authz` model/migration sync check
 - `cargo fmt --all --check`
 - `cargo check --workspace`
 - `cargo test --workspace`
