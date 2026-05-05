@@ -17,44 +17,26 @@ async fn heartbeat() -> impl Responder {
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    let backend_host = std::env::var("BACKEND_HOST")
-        .ok()
-        .or_else(|| config::read_project_conf("BACKEND_HOST"))
-        .unwrap_or_else(|| "127.0.0.1".to_string());
-
-    let backend_port: u16 = std::env::var("BACKEND_PORT")
-        .ok()
-        .or_else(|| config::read_project_conf("BACKEND_PORT"))
-        .and_then(|v| v.parse().ok())
-        .unwrap_or(8080);
-
-    let gui_port: u16 = std::env::var("GUI_PORT")
-        .ok()
-        .or_else(|| config::read_project_conf("GUI_PORT"))
-        .and_then(|v| v.parse().ok())
-        .unwrap_or(3030);
-
-    let admin_gui_port: u16 = std::env::var("ADMIN_GUI_PORT")
-        .ok()
-        .or_else(|| config::read_project_conf("ADMIN_GUI_PORT"))
-        .and_then(|v| v.parse().ok())
-        .unwrap_or(3031);
-
-    let domain_name = std::env::var("DOMAIN_NAME")
-        .ok()
-        .or_else(|| config::read_project_conf("DOMAIN_NAME"));
+    let config = config::Config::load()
+        .unwrap_or_else(|e| { eprintln!("error: {e}"); std::process::exit(1) });
 
     println!(
         "Backend listening on http://{}:{}",
-        backend_host, backend_port
+        config.server.host, config.server.port
     );
 
-    let gui_origin_ip = format!("http://127.0.0.1:{gui_port}");
-    let gui_origin_local = format!("http://localhost:{gui_port}");
-    let admin_origin_ip = format!("http://127.0.0.1:{admin_gui_port}");
-    let admin_origin_local = format!("http://localhost:{admin_gui_port}");
-    let domain_origin_https = domain_name.as_deref().map(|d| format!("https://{d}"));
-    let domain_origin_http = domain_name.as_deref().map(|d| format!("http://{d}"));
+    let gui_origin_ip = format!("http://127.0.0.1:{}", config.gui.port);
+    let gui_origin_local = format!("http://localhost:{}", config.gui.port);
+    let admin_origin_ip = format!("http://127.0.0.1:{}", config.admin_gui.port);
+    let admin_origin_local = format!("http://localhost:{}", config.admin_gui.port);
+    let domain_origin_https = config
+        .deploy
+        .as_ref()
+        .map(|d| format!("https://{}", d.domain_name));
+    let domain_origin_http = config
+        .deploy
+        .as_ref()
+        .map(|d| format!("http://{}", d.domain_name));
 
     HttpServer::new(move || {
         let mut cors = Cors::default()
@@ -70,16 +52,14 @@ async fn main() -> std::io::Result<()> {
             cors = cors.allowed_origin(origin);
         }
 
-        let cors = cors
-            .allowed_methods(vec!["GET"])
-            .allow_any_header();
+        let cors = cors.allowed_methods(vec!["GET"]).allow_any_header();
 
         App::new()
             .wrap(cors)
             .app_data(web::JsonConfig::default())
             .service(heartbeat)
     })
-    .bind((backend_host.as_str(), backend_port))?
+    .bind((config.server.host.as_str(), config.server.port))?
     .run()
     .await
 }

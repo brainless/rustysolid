@@ -3,26 +3,66 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
-CONFIG_FILE="${1:-${PROJECT_ROOT}/project.conf}"
+CONFIG_FILE="${1:-${PROJECT_ROOT}/project.toml}"
 
 if [ ! -f "$CONFIG_FILE" ]; then
   echo "Config not found: $CONFIG_FILE"
-  echo "Create it from project.conf.template"
+  echo "Create it from project.toml.template"
   exit 1
 fi
 
-# shellcheck disable=SC1090
-source "$CONFIG_FILE"
+# Read a value from a TOML file: toml_get <file> <section> <key>
+toml_get() {
+  python3 - "$1" "$2" "$3" <<'PYEOF'
+import sys
 
-required_vars=(PROJECT_NAME SERVER_IP SSH_USER DOMAIN_NAME LETSENCRYPT_EMAIL)
-for v in "${required_vars[@]}"; do
+file, section, key = sys.argv[1], sys.argv[2], sys.argv[3]
+
+try:
+    import tomllib
+    with open(file, "rb") as f:
+        data = tomllib.load(f)
+    val = data.get(section, {}).get(key)
+    if val is not None:
+        print(val)
+    sys.exit(0)
+except ImportError:
+    pass
+
+# Fallback for Python < 3.11
+in_section = False
+with open(file) as f:
+    for line in f:
+        line = line.strip()
+        if not line or line.startswith('#'):
+            continue
+        if line.startswith('[') and line.endswith(']'):
+            in_section = (line[1:-1].strip() == section)
+            continue
+        if in_section and '=' in line:
+            k, _, v = line.partition('=')
+            if k.strip() == key:
+                v = v.strip().strip('"').strip("'").split('#')[0].strip()
+                print(v)
+                break
+PYEOF
+}
+
+PROJECT_NAME="$(toml_get "$CONFIG_FILE" project name)"
+SERVER_IP="$(toml_get "$CONFIG_FILE" deploy server_ip)"
+SSH_USER="$(toml_get "$CONFIG_FILE" deploy ssh_user)"
+DOMAIN_NAME="$(toml_get "$CONFIG_FILE" deploy domain_name)"
+LETSENCRYPT_EMAIL="$(toml_get "$CONFIG_FILE" deploy letsencrypt_email)"
+DB_KIND="$(toml_get "$CONFIG_FILE" database kind)"
+
+for v in PROJECT_NAME SERVER_IP SSH_USER DOMAIN_NAME LETSENCRYPT_EMAIL; do
   if [ -z "${!v:-}" ]; then
     echo "Missing required config key: $v"
     exit 1
   fi
 done
 
-REMOTE_BASE_DIR="${REMOTE_BASE_DIR:-/home/${SSH_USER}/apps}"
+REMOTE_BASE_DIR="/home/${SSH_USER}/apps"
 REMOTE_PROJECT_ROOT="${REMOTE_BASE_DIR}/${PROJECT_NAME}"
 DEPLOY_ROOT="/opt/${PROJECT_NAME}"
 TEMP_CERT_SITE="${PROJECT_NAME}-temp-cert"
@@ -88,15 +128,13 @@ remote_exec "sudo mkdir -p ${DEPLOY_ROOT}/gui ${DEPLOY_ROOT}/admin-gui"
 remote_exec "sudo chown -R ${SSH_USER}:${SSH_USER} ${DEPLOY_ROOT}"
 
 echo "[setup] writing server.env"
-{
-  printf 'BACKEND_HOST=%s\n' "${BACKEND_HOST:-127.0.0.1}"
-  printf 'BACKEND_PORT=%s\n' "${BACKEND_PORT:-8080}"
-  if [ -n "${DB_PASSWORD}" ]; then
-    printf 'DATABASE_URL=postgresql://%s:%s@localhost/%s\n' "${SSH_USER}" "${DB_PASSWORD}" "${PROJECT_NAME}"
-  else
-    printf 'DATABASE_URL=app.db\n'
-  fi
-} | ssh -o StrictHostKeyChecking=no "${SSH_USER}@${SERVER_IP}" "cat > /tmp/server.env"
+if [ -n "${DB_PASSWORD}" ]; then
+  printf 'DATABASE_URL=postgresql://%s:%s@localhost/%s\n' "${SSH_USER}" "${DB_PASSWORD}" "${PROJECT_NAME}" \
+    | ssh -o StrictHostKeyChecking=no "${SSH_USER}@${SERVER_IP}" "cat > /tmp/server.env"
+else
+  printf 'DATABASE_URL=app.db\n' \
+    | ssh -o StrictHostKeyChecking=no "${SSH_USER}@${SERVER_IP}" "cat > /tmp/server.env"
+fi
 remote_exec "sudo mv /tmp/server.env ${DEPLOY_ROOT}/server.env && sudo chown ${SSH_USER}:${SSH_USER} ${DEPLOY_ROOT}/server.env && chmod 600 ${DEPLOY_ROOT}/server.env"
 
 echo "[setup] upload certbot nginx bootstrap template"

@@ -1,0 +1,28 @@
+# Non-secret server (prod) config. Committed to the repo.
+# deploy.sh uploads this to the server as project.toml alongside the binary.
+# DATABASE_URL is injected at runtime as an env var by systemd (from server.env),
+# which overrides the placeholder value below.
+
+[project]
+name  = "myapp"
+title = "My App"
+
+[database]
+kind = "postgres"
+url  = "app.db"   # overridden at runtime by DATABASE_URL env var
+
+[server]
+host = "127.0.0.1"
+port = 8080
+
+[gui]
+port = 3030
+
+[admin_gui]
+port = 3031
+
+[deploy]
+server_ip         = "203.0.113.10"
+ssh_user          = "deploy"
+domain_name       = "example.com"
+letsencrypt_email = "admin@example.com"

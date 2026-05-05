@@ -1,0 +1,29 @@
+# Copy to project.toml and fill in your values.
+# project.toml is gitignored — never commit secrets.
+
+[project]
+name  = "myapp"
+title = "My App"
+
+[database]
+# kind: sqlite | postgres
+kind = "sqlite"
+# sqlite example: url = "app.db"
+# postgres example: url = "postgresql://postgres:postgres@127.0.0.1:5432/myapp"
+url  = "app.db"
+
+[server]
+host = "127.0.0.1"
+port = 8080
+
+[gui]
+port = 3030
+
+[admin_gui]
+port = 3031
+
+[deploy]
+server_ip         = "203.0.113.10"
+ssh_user          = "deploy"
+domain_name       = "example.com"
+letsencrypt_email = "admin@example.com"

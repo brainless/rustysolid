@@ -16,3 +16,4 @@ postgres = { version = "0.19", optional = true }
 rusqlite = { version = "0.32", features = ["bundled"], optional = true }
 serde.workspace = true
 shared-types = { path = "../shared-types" }
+toml = "1.1.2"

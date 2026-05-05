@@ -3,27 +3,72 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
-CONFIG_FILE="${1:-${PROJECT_ROOT}/project.conf}"
+CONFIG_FILE="${1:-${PROJECT_ROOT}/project.toml}"
+SERVER_CONFIG="${PROJECT_ROOT}/scripts/configs/server.toml"
 
 if [ ! -f "$CONFIG_FILE" ]; then
   echo "Config not found: $CONFIG_FILE"
-  echo "Create it from project.conf.template"
+  echo "Create it from project.toml.template"
   exit 1
 fi
 
-# shellcheck disable=SC1090
-source "$CONFIG_FILE"
+if [ ! -f "$SERVER_CONFIG" ]; then
+  echo "Server config not found: $SERVER_CONFIG"
+  exit 1
+fi
 
-required_vars=(PROJECT_NAME SERVER_IP SSH_USER DOMAIN_NAME)
-for v in "${required_vars[@]}"; do
+# Read a value from a TOML file: toml_get <file> <section> <key>
+toml_get() {
+  python3 - "$1" "$2" "$3" <<'PYEOF'
+import sys
+
+file, section, key = sys.argv[1], sys.argv[2], sys.argv[3]
+
+try:
+    import tomllib
+    with open(file, "rb") as f:
+        data = tomllib.load(f)
+    val = data.get(section, {}).get(key)
+    if val is not None:
+        print(val)
+    sys.exit(0)
+except ImportError:
+    pass
+
+# Fallback for Python < 3.11
+in_section = False
+with open(file) as f:
+    for line in f:
+        line = line.strip()
+        if not line or line.startswith('#'):
+            continue
+        if line.startswith('[') and line.endswith(']'):
+            in_section = (line[1:-1].strip() == section)
+            continue
+        if in_section and '=' in line:
+            k, _, v = line.partition('=')
+            if k.strip() == key:
+                v = v.strip().strip('"').strip("'").split('#')[0].strip()
+                print(v)
+                break
+PYEOF
+}
+
+PROJECT_NAME="$(toml_get "$CONFIG_FILE" project name)"
+SERVER_IP="$(toml_get "$CONFIG_FILE" deploy server_ip)"
+SSH_USER="$(toml_get "$CONFIG_FILE" deploy ssh_user)"
+DOMAIN_NAME="$(toml_get "$CONFIG_FILE" deploy domain_name)"
+BACKEND_PORT="$(toml_get "$SERVER_CONFIG" server port)"
+BACKEND_PORT="${BACKEND_PORT:-8080}"
+
+for v in PROJECT_NAME SERVER_IP SSH_USER DOMAIN_NAME; do
   if [ -z "${!v:-}" ]; then
     echo "Missing required config key: $v"
     exit 1
   fi
 done
 
-REMOTE_BASE_DIR="${REMOTE_BASE_DIR:-/home/${SSH_USER}/apps}"
-BACKEND_PORT="${BACKEND_PORT:-8080}"
+REMOTE_BASE_DIR="/home/${SSH_USER}/apps"
 REMOTE_ROOT="${REMOTE_BASE_DIR}/${PROJECT_NAME}"
 DEPLOY_ROOT="/opt/${PROJECT_NAME}"
 BACKEND_BIN="${PROJECT_NAME}-backend"
@@ -57,9 +102,14 @@ rsync -az --delete \
   --exclude='admin-gui/dist/' \
   --exclude='.git/' \
   --exclude='.DS_Store' \
+  --exclude='project.toml' \
   -e "ssh -o StrictHostKeyChecking=no" \
   "$PROJECT_ROOT/" \
   "${SSH_USER}@${SERVER_IP}:${REMOTE_ROOT}/"
+
+echo "[deploy] upload server config"
+scp -o StrictHostKeyChecking=no "${SERVER_CONFIG}" "${SSH_USER}@${SERVER_IP}:/tmp/project.toml"
+remote_exec "sudo mv /tmp/project.toml ${DEPLOY_ROOT}/project.toml && sudo chown ${SSH_USER}:${SSH_USER} ${DEPLOY_ROOT}/project.toml"
 
 echo "[deploy] build backend on server"
 remote_exec "command -v sccache >/dev/null 2>&1 || (SARCH=\$(uname -m); case \"\$SARCH\" in x86_64) ST=x86_64-unknown-linux-musl ;; aarch64) ST=aarch64-unknown-linux-musl ;; *) echo \"unsupported arch: \$SARCH\"; exit 1 ;; esac && SCCACHE_VER=\$(curl -fsSL -o /dev/null -w '%{url_effective}' https://github.com/mozilla/sccache/releases/latest | grep -o 'v[0-9.]*\$') && curl -fsSL \"https://github.com/mozilla/sccache/releases/download/\${SCCACHE_VER}/sccache-\${SCCACHE_VER}-\${ST}.tar.gz\" | tar xz -C /tmp && sudo mv /tmp/sccache-\${SCCACHE_VER}-\${ST}/sccache /usr/local/bin/sccache && rm -rf /tmp/sccache-\${SCCACHE_VER}-\${ST})"
@@ -122,6 +172,7 @@ else
   echo "[deploy] server.env missing; run setup-server.sh first"
   exit 1
 fi
+
 remote_exec "sudo systemctl enable certbot.timer"
 remote_exec "sudo systemctl start certbot.timer"
 
